@@ -42,3 +42,18 @@ pub fn chat_save_message(db_state: State<'_, DbState>, id: String, payload: Stri
 pub fn outbox_enqueue(db_state: State<'_, DbState>, payload: String) -> Result<String, String> {
     crate::db::outbox::enqueue_task(&db_state.db, payload)
 }
+
+#[tauri::command]
+pub async fn query_swarm_memory(workspace_id: String, query: String, limit: u32) -> Result<Vec<String>, String> {
+    Ok(vec![])
+}
+
+#[tauri::command]
+pub async fn force_reindex_workspace(workspace_id: String) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_vector_memory(workspace_id: String) -> Result<(), String> {
+    Ok(())
+}

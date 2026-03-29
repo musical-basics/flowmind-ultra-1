@@ -33,3 +33,8 @@ pub async fn approve_commander_plan(state: tauri::State<'_, crate::orchestrator:
     state.commander_approval.notify_one();
     Ok(())
 }
+
+#[tauri::command]
+pub async fn manual_compiler_override(workspace_id: String) -> Result<(), String> {
+    Ok(())
+}

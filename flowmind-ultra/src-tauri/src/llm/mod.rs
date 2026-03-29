@@ -4,3 +4,6 @@ pub mod ledger;
 pub mod sanitizer;
 pub mod slicer;
 pub mod commands;
+pub mod sniper;
+pub mod embeddings;
+pub mod memory_indexer;

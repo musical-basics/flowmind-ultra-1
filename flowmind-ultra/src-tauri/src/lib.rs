@@ -3,6 +3,7 @@ mod pty;
 mod llm;
 mod orchestrator;
 mod workers;
+mod audio;
 
 use tauri::Manager;
 
@@ -66,7 +67,17 @@ pub fn run() {
         orchestrator::commands::start_swarm,
         orchestrator::commands::approve_commander_plan,
         workers::commands::set_worker_override,
-        workers::commands::exec_global_script
+        workers::commands::exec_global_script,
+        orchestrator::commands::manual_compiler_override,
+        audio::commands::start_voice_dictation,
+        audio::commands::stop_and_transcribe_audio,
+        audio::commands::cancel_voice_dictation,
+        db::commands::query_swarm_memory,
+        db::commands::force_reindex_workspace,
+        db::commands::clear_vector_memory,
+        workers::commands::get_snapshot_timeline,
+        workers::commands::revert_to_snapshot,
+        workers::commands::preview_snapshot_diff
     ])
     .on_window_event(|window, event| {
         if let tauri::WindowEvent::Destroyed = event {

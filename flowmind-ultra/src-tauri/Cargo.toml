@@ -41,3 +41,23 @@ wezterm-term = { package = "tattoy-wezterm-term", version = "0.1.0-fork.5" }
 regex = "1.10"
 strip-ansi-escapes = "0.2"
 ignore = "0.4"
+
+# Epic 1: QA 2.0
+tokio-util = "0.7"
+
+# Epic 2: Vibecoding
+cpal = "0.15"
+hound = "3.5"
+rubato = "0.14"
+whisper-rs = { version = "0.11", features = [] }
+
+# Epic 3: Vectorized Swarm Memory
+lancedb = "0.11"
+arrow-array = "52.0"
+candle-core = "0.6"
+candle-nn = "0.6"
+tokenizers = "0.19"
+
+# Epic 4: Visual State Time-Travel
+similar = "2.5"
+zstd = "0.13"

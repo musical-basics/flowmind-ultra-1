@@ -21,3 +21,24 @@ pub async fn exec_global_script(manager: State<'_, Arc<ClusterManager>>, script:
     }]).await;
     Ok(())
 }
+
+#[derive(serde::Serialize)]
+pub struct CommitNode {
+    pub timestamp: u64,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn get_snapshot_timeline(workspace_id: String) -> Result<Vec<CommitNode>, String> {
+    Ok(vec![])
+}
+
+#[tauri::command]
+pub async fn revert_to_snapshot(workspace_id: String, timestamp: u64) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn preview_snapshot_diff(timestamp: u64) -> Result<String, String> {
+    Ok(String::new())
+}

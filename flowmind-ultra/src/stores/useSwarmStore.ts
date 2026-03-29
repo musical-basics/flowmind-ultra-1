@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { listen } from '@tauri-apps/api/event';
 
-export type NodeStatus = 'Idle' | 'Active' | 'AwaitingApproval' | 'Complete' | 'Failed';
+export type NodeStatus = 'Idle' | 'Active' | 'AwaitingApproval' | 'Complete' | 'Failed' | 'Healing' | 'AwaitingHumanFix';
 
 export interface SwarmStation {
   id: string;
