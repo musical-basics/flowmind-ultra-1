@@ -4,6 +4,8 @@ use std::io::Read;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
+use tokio::time::Duration;
+use crate::pty::stability::StabilityMonitor;
 
 #[derive(Serialize, Clone)]
 pub struct PTYPayload {
@@ -60,25 +62,65 @@ impl TerminalSession {
 
         let _ = app.emit("pty-state", TerminalStatePayload { id: id.clone(), state: "Connecting".to_string() });
 
+        let stability = Arc::new(StabilityMonitor::new());
+
         let id_clone = id.clone();
-        std::thread::spawn(move || {
+        let app_clone = app.clone();
+        let stability_clone = stability.clone();
+
+        tokio::task::spawn_blocking(move || {
             let mut buf = [0u8; 8192];
-            let _ = app.emit("pty-state", TerminalStatePayload { id: id_clone.clone(), state: "Online".to_string() });
+            let _ = app_clone.emit("pty-state", TerminalStatePayload { id: id_clone.clone(), state: "Online".to_string() });
             
             loop {
                 match reader.read(&mut buf) {
                     Ok(n) if n > 0 => {
                         let data = buf[..n].to_vec();
-                        // 26. Broadcast terminal output chunk at 60fps (thottling is handled on frontend or in advance iterators)
-                        let _ = app.emit("pty-output", PTYPayload {
+                        tauri::async_runtime::block_on(async {
+                            stability_clone.notify_activity(n).await;
+                        });
+                        // 26. Broadcast terminal output chunk at 60fps
+                        let _ = app_clone.emit("pty-output", PTYPayload {
                             id: id_clone.clone(),
                             data,
                         });
                     }
                     _ => {
-                        let _ = app.emit("pty-state", TerminalStatePayload { id: id_clone.clone(), state: "Offline".to_string() });
+                        let _ = app_clone.emit("pty-state", TerminalStatePayload { id: id_clone.clone(), state: "Offline".to_string() });
                         break;
                     }
+                }
+            }
+        });
+
+        // 34. Poller task for stability and semantic flush
+        let id_poller = id.clone();
+        let app_poller = app.clone();
+        let stability_poller = stability.clone();
+        tokio::spawn(async move {
+            let mut flushed = false;
+            loop {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                let last = *stability_poller.last_read_time.lock().await;
+                let elapsed = last.elapsed().as_millis() as u64;
+
+                let mut idle = stability_poller.is_idle.lock().await;
+                
+                if elapsed < 1000 {
+                    if *idle {
+                        *idle = false;
+                        flushed = false;
+                        let _ = app_poller.emit("pty-state", TerminalStatePayload { id: id_poller.clone(), state: "Working".to_string() });
+                    }
+                } else if elapsed >= 1000 && !*idle {
+                    *idle = true;
+                    let _ = app_poller.emit("pty-state", TerminalStatePayload { id: id_poller.clone(), state: "Online".to_string() });
+                }
+
+                if elapsed >= 3000 && !flushed {
+                    flushed = true;
+                    // 35. Trigger Semantic Flush
+                    let _ = app_poller.emit("pty-semantic-flush", TerminalStatePayload { id: id_poller.clone(), state: "IdleFlush".to_string() });
                 }
             }
         });
