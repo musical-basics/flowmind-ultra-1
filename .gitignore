@@ -1,0 +1,11 @@
+# Repomix outputs
+*repomix*.xml
+repomix*.xml
+*repomix*.md
+
+# Node
+node_modules/
+.DS_Store
+
+# Tauri
+flowmind-ultra/src-tauri/target/
