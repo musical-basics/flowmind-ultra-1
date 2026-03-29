@@ -8,6 +8,7 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import '@xterm/xterm/css/xterm.css';
 
 interface PTYPayload {
+  id: string;
   data: number[];
 }
 
@@ -52,7 +53,8 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
     let unlisten: UnlistenFn | null = null;
 
     const initTerminal = async () => {
-      unlisten = await listen<PTYPayload>(`pty_output_${sessionId}`, (event) => {
+      unlisten = await listen<PTYPayload>('pty-output', (event) => {
+        if (event.payload.id !== sessionId) return;
         const charData = new Uint8Array(event.payload.data);
         term.write(charData);
         setTerminalState('Working');

@@ -57,6 +57,9 @@ impl ExecutionWorker {
         }
 
         if let Some(pty) = &self.pty_session {
+            // Clear PTY visually for a fresh task
+            let _ = pty.lock().await.write(b"\x1b[2J\x1b[3J\x1b[H");
+
             // Token limiting simulated delay
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             
@@ -109,18 +112,37 @@ impl ExecutionWorker {
             let output = pty_lock.output_buffer.lock().await.clone();
             drop(pty_lock);
 
-            let re = regex::Regex::new(r"(?i)(error:|command not found|failed|exception|traceback|panic)").unwrap();
-            if re.is_match(&output) {
+            let re_port = regex::Regex::new(r"(?i)(eaddrinuse|port .* already in use|address already in use)").unwrap();
+            let re_oom = regex::Regex::new(r"(?i)(heap out of memory|oom|out of memory)").unwrap();
+            let re_dep = regex::Regex::new(r"(?i)(cannot find module|module not found|no matching package)").unwrap();
+            let re_rust = regex::Regex::new(r"(?i)(error\[e[0-9]+\]|build failed)").unwrap();
+            let re_general = regex::Regex::new(r"(?i)(error:|command not found|failed|exception|traceback|panic)").unwrap();
+
+            let mut specific_healing_prompt = "";
+
+            if re_port.is_match(&output) {
+                specific_healing_prompt = "Port Collision Detected. Generate a bash script that either kills the process occupying the port (using lsof/kill) or configures the service to use an alternate port, then restarts the execution.";
+            } else if re_oom.is_match(&output) {
+                specific_healing_prompt = "Out of Memory Detected. Generate a script that configures Node max_old_space_size or reduces parallelism flag, then retries the process.";
+            } else if re_dep.is_match(&output) {
+                specific_healing_prompt = "Missing Dependency Detected. Generate a script that invokes `npm install`, `pnpm add`, or `cargo add` for the exact missing package before continuing.";
+            } else if re_rust.is_match(&output) {
+                specific_healing_prompt = "Rust Compiler Error Detected. Generate a bash patch (e.g., using sed or cat to rewrite lines) to fix the Rust code syntax/type/lifetime issue.";
+            } else if re_general.is_match(&output) {
+                specific_healing_prompt = "Execution Error Detected. Evaluate the error traceback and generate a bash script to fix the bug directly.";
+            }
+
+            if !specific_healing_prompt.is_empty() {
                 let _ = self.app.emit("station_update", crate::orchestrator::loop_runner::StationUpdate {
                     station: "QA".to_string(),
                     status: "Active".to_string(),
-                    detail: Some("Errors detected in xterm. Auto-Healing...".to_string()),
+                    detail: Some("Errors detected in xterm. Identifying specific error class & Auto-Healing...".to_string()),
                 });
 
                 let tail: String = output.lines().rev().take(30).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
                 
-                let sys_prompt = "You are the QA Fixer Node. The previous command failed. Fix it by generating a new bash script. Start directly with commands. Avoid code blocks. Output must be a valid raw bash script.";
-                let user_prompt = format!("Task: {}\nPrevious Terminal Output / Error:\n{}", task.title, tail);
+                let sys_prompt = format!("You are the QA Fixer Node. The previous execution failed. {}\n\nStart your fix immediately with bash commands. Avoid code blocks. Output must be raw valid bash.", specific_healing_prompt);
+                let user_prompt = format!("Task: {}\nPrevious Terminal Output / Error Tail:\n{}", task.title, tail);
 
                 let req = ChatRequest {
                     model: task.model.clone(),
