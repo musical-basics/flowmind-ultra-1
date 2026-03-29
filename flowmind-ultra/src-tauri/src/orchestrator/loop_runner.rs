@@ -1,5 +1,8 @@
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
+use crate::db::store::{DbState, FILE_SNAPSHOTS, SNAPSHOT_TIMELINE};
+use crate::workers::history::generate_unified_diff;
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::llm::client::LlmClient;
 use crate::llm::ledger::LedgerManager;
 use crate::workers::manager::ClusterManager;
@@ -134,10 +137,38 @@ pub async fn start_orchestration(
         approval.commander_approval.notified().await;
         emit_station("Commander", "Complete", None);
 
-        // Node 6: Executor
+        // Node 6: Worker Cluster (Execution)
         ctx.active_state = SwarmState::Executor;
-        emit_station("Executor", "Active", Some("Deploying agents into Worker Cluster...".into()));
-        
+        emit_station("Executor", "Active", Some(format!("Executing Cluster Actions for Chunk {}", chunk.id)));
+
+        // --- EPIC 4: CHECKPOINTING ---
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        if let Ok(db_state) = app.try_state::<DbState>() {
+            if let Ok(write_txn) = db_state.db.begin_write() {
+                {
+                    let _ = write_txn.open_table(SNAPSHOT_TIMELINE).map(|mut timeline| {
+                        let _ = timeline.insert(ts, chunk.title.as_str());
+                    });
+                    
+                    let _ = write_txn.open_table(FILE_SNAPSHOTS).map(|mut snapshots| {
+                        if let Some(graph) = &chunk.dependency_graph {
+                            for file_node in &graph.files {
+                                let full_path = std::path::Path::new(&workspace_dir).join(&file_node.filepath);
+                                if full_path.exists() {
+                                    if let Ok(content) = std::fs::read_to_string(&full_path) {
+                                        let compressed = zstd::encode_all(content.as_bytes(), 3).unwrap();
+                                        let _ = snapshots.insert((ts, file_node.filepath.as_str()), compressed.as_slice());
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                let _ = write_txn.commit();
+            }
+        }
+        // -----------------------------
+
         let cluster_mgr = app.state::<Arc<ClusterManager>>();
         let mut tasks = Vec::new();
         

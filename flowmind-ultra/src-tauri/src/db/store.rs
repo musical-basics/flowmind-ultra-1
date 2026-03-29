@@ -6,6 +6,8 @@ pub const WORKSPACES: TableDefinition<&str, &str> = TableDefinition::new("worksp
 pub const CONVERSATIONS: TableDefinition<&str, &str> = TableDefinition::new("conversations");
 pub const MESSAGES: TableDefinition<&str, &str> = TableDefinition::new("messages");
 pub const CHAT_OUTBOX_TASKS: TableDefinition<&str, &str> = TableDefinition::new("chat_outbox_tasks");
+pub const FILE_SNAPSHOTS: TableDefinition<(u64, &str), &[u8]> = TableDefinition::new("file_snapshots");
+pub const SNAPSHOT_TIMELINE: TableDefinition<u64, &str> = TableDefinition::new("snapshot_timeline");
 
 pub struct DbState {
     pub db: Arc<Database>,

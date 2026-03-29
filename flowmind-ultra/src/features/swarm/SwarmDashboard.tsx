@@ -14,6 +14,9 @@ import { useWorkerStore } from '../../stores/useWorkerStore';
 import { FileTree } from '../workspace/FileTree';
 import { FlattenerSettingsPanel } from './FlattenerSettingsPanel';
 import { MemoryViewer } from './MemoryViewer';
+import { ScrubSlider } from './ScrubSlider';
+import { useTimeTravelStore } from '../../stores/useTimeTravelStore';
+import { useEffect } from 'react';
 
 export function SwarmDashboard() {
   const [prompt, setPrompt] = useState('');
@@ -24,6 +27,13 @@ export function SwarmDashboard() {
   const { currentWorkspace } = useWorkspaceStore();
   const { stations } = useSwarmStore();
   const { manualOverride, setManualOverride } = useWorkerStore();
+  const { fetchTimeline } = useTimeTravelStore();
+
+  useEffect(() => {
+    if (currentWorkspace) {
+      fetchTimeline(currentWorkspace.path.replace('file://', ''));
+    }
+  }, [currentWorkspace, fetchTimeline]);
 
   const isComplete = stations.find((s) => s.id === 'Complete')?.status === 'Complete';
   const isAwaitingApproval = stations.find((s) => s.id === 'Commander')?.status === 'AwaitingApproval';
@@ -139,6 +149,7 @@ export function SwarmDashboard() {
           {viewTab === 'agents' && <MemoryViewer />}
         </div>
       </div>
+      <ScrubSlider />
     </div>
   );
 }
