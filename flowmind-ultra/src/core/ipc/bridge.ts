@@ -31,4 +31,19 @@ export const Bridge = {
   llmFetchModels: async (apiKey: string): Promise<any> => {
     return invoke('fetch_models', { apiKey });
   },
+  startSwarm: async (
+    workspaceDir: string, 
+    prompt: string, 
+    overseerModel: string, 
+    plannerModel: string, 
+    executorModel: string
+  ): Promise<void> => {
+    return invoke('start_swarm', { 
+      workspaceDir, 
+      prompt, 
+      overseerModel, 
+      plannerModel, 
+      executorModel 
+    });
+  },
 };

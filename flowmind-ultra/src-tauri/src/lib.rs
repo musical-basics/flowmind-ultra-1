@@ -53,7 +53,8 @@ pub fn run() {
         pty::commands::snapshot_ansi,
         pty::commands::snapshot_lines,
         llm::commands::fetch_models,
-        llm::commands::sanitize_llm_json
+        llm::commands::sanitize_llm_json,
+        orchestrator::commands::start_swarm
     ])
     .on_window_event(|window, event| {
         if let tauri::WindowEvent::Destroyed = event {
