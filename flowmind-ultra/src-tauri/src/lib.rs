@@ -1,4 +1,7 @@
 mod db;
+mod pty;
+
+use tauri::Manager;
 
 #[tauri::command]
 fn log_event(message: String) {
@@ -24,6 +27,10 @@ pub fn run() {
         });
 
         app.manage(db::store::DbState { db: db_arc });
+        
+        let pty_manager = pty::manager::TerminalManager::new();
+        app.manage(pty_manager);
+
         Ok(())
     })
     .plugin(tauri_plugin_fs::init())
@@ -36,7 +43,21 @@ pub fn run() {
         db::commands::workspace_save,
         db::commands::workspace_read,
         db::commands::chat_save_message,
-        db::commands::outbox_enqueue
+        db::commands::outbox_enqueue,
+        pty::commands::terminal_create,
+        pty::commands::terminal_write,
+        pty::commands::terminal_resize,
+        pty::commands::terminal_close,
+        pty::commands::snapshot_ansi,
+        pty::commands::snapshot_lines
     ])
+    .on_window_event(|window, event| {
+        if let tauri::WindowEvent::Destroyed = event {
+            let manager = window.state::<pty::manager::TerminalManager>();
+            tauri::async_runtime::block_on(async {
+                manager.kill_all().await;
+            });
+        }
+    })
     .expect("error while running tauri application");
 }

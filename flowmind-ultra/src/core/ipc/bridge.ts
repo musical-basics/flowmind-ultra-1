@@ -16,4 +16,16 @@ export const Bridge = {
   outboxEnqueue: async (payload: string): Promise<string> => {
     return invoke('outbox_enqueue', { payload });
   },
+  terminalCreate: async (id: string): Promise<void> => {
+    return invoke('terminal_create', { id });
+  },
+  terminalWrite: async (id: string, data: number[]): Promise<void> => {
+    return invoke('terminal_write', { id, data });
+  },
+  terminalResize: async (id: string, rows: number, cols: number): Promise<void> => {
+    return invoke('terminal_resize', { id, rows, cols });
+  },
+  terminalClose: async (id: string): Promise<void> => {
+    return invoke('terminal_close', { id });
+  },
 };
