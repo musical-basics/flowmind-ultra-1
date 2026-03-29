@@ -20,6 +20,28 @@ pub fn run() {
         log::info!("Initializing Database...");
         let db_arc = db::store::init_db(app.handle())
             .expect("Failed to initialize database");
+            
+        // EPIC 5: Supabase Collaborative Handover
+        // Load .env.local if standard env is missing
+        if std::env::var("SUPABASE_URL").is_err() {
+            let env_path = app.path().resource_dir().unwrap_or_default().join("../.env.local");
+            if let Ok(content) = std::fs::read_to_string(env_path) {
+                for line in content.lines() {
+                    let parts: Vec<&str> = line.splitn(2, '=').collect();
+                    if parts.len() == 2 {
+                        std::env::set_var(parts[0].trim(), parts[1].trim());
+                    }
+                }
+            }
+        }
+        
+        let supabase = db::supabase::SupabaseClient::from_env().ok();
+        if let Some(sb) = supabase {
+            app.manage(std::sync::Arc::new(sb));
+            log::info!("Supabase Collaborative Mode: Enabled");
+        } else {
+            log::warn!("Supabase Collaborative Mode: Disabled (Missing Keys)");
+        }
 
         // Repair any lingering processing messages on boot
         let _ = db::outbox::chat_repair_messages(&db_arc);

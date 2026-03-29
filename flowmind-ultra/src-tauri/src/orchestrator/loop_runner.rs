@@ -7,6 +7,7 @@ use crate::llm::client::LlmClient;
 use crate::llm::ledger::LedgerManager;
 use crate::workers::manager::ClusterManager;
 use crate::workers::executor::WorkerTask;
+use crate::db::supabase::{SupabaseClient, SwarmRunUpdate};
 use super::state::{SwarmContext, SwarmState, SprintChunk};
 use super::nodes::*;
 
@@ -45,10 +46,29 @@ pub async fn start_orchestration(
     );
 
     let emit_station = |station: &str, status: &str, detail: Option<String>| {
-        let _ = app.emit("station_update", StationUpdate {
+        let update = StationUpdate {
             station: station.to_string(),
             status: status.to_string(),
-            detail,
+            detail: detail.clone(),
+        };
+        let _ = app.emit("station_update", update);
+        
+        // EPIC 5: Collaborative Mirroring (Supabase Uplink)
+        let app_sb = app.clone();
+        let ws_sb = workspace_dir.clone();
+        let status_sb = status.to_string();
+        let detail_sb = detail.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Some(sb) = app_sb.try_state::<Arc<SupabaseClient>>() {
+                let _ = sb.upsert_run(SwarmRunUpdate {
+                    workspace_id: ws_sb,
+                    state: status_sb,
+                    detail: detail_sb,
+                    is_commander_approved: false, 
+                    is_compiler_approved: false,
+                    prompt: None,
+                }).await;
+            }
         });
     };
 
@@ -130,11 +150,34 @@ pub async fn start_orchestration(
         emit_station("Commander", "Active", Some("Routing dependencies...".into()));
         let plan = run_commander(&client, &executor_model, &graph).await;
         chunk.execution_plan = Some(plan.clone());
-        emit_station("Commander", "AwaitingApproval", Some("Awaiting your authorization".into()));
+        
+        // Wait for Commander Approval (Local or Remote)
+        emit_station("Commander", "AwaitingApproval", Some("Awaiting Multi-Device Confirmation...".into()));
+        
+        let commander_notify = ctx.commander_approval.clone();
+        let ws_remote = workspace_dir.clone();
+        let app_remote = app.clone();
+        
+        // Spawn a background task to poll Supabase for remote approval
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                if let Some(sb) = app_remote.try_state::<Arc<SupabaseClient>>() {
+                    if let Ok(Some(run)) = sb.get_run_status(&ws_remote).await {
+                        if run.is_commander_approved {
+                            let _ = tx.send(()).await;
+                            break;
+                        }
+                    }
+                }
+            }
+        });
 
-        // 90. Suspend execution until the user manually triggers Tauri command: approve_commander_plan
-        let approval = app.state::<crate::orchestrator::state::SwarmOrchestratorState>();
-        approval.commander_approval.notified().await;
+        tokio::select! {
+            _ = commander_notify.notified() => { log::info!("Local Approval Received"); }
+            _ = rx.recv() => { log::info!("Remote Approval Received via Supabase"); }
+        }
         emit_station("Commander", "Complete", None);
 
         // Node 6: Worker Cluster (Execution)

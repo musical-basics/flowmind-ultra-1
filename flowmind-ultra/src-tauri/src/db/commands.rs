@@ -54,6 +54,13 @@ pub async fn force_reindex_workspace(workspace_id: String) -> Result<(), String>
 }
 
 #[tauri::command]
+pub async fn get_supabase_config() -> Result<(String, String), String> {
+    let url = std::env::var("SUPABASE_URL").unwrap_or_default();
+    let key = std::env::var("SUPABASE_SERVICE_ROLE_KEY").unwrap_or_default();
+    Ok((url, key))
+}
+
+#[tauri::command]
 pub async fn clear_vector_memory(workspace_id: String) -> Result<(), String> {
     Ok(())
 }

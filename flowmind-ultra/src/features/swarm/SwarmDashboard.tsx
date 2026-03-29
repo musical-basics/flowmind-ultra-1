@@ -16,7 +16,9 @@ import { FlattenerSettingsPanel } from './FlattenerSettingsPanel';
 import { MemoryViewer } from './MemoryViewer';
 import { ScrubSlider } from './ScrubSlider';
 import { useTimeTravelStore } from '../../stores/useTimeTravelStore';
+import { useSupabaseStore } from '../../stores/useSupabaseStore';
 import { useEffect } from 'react';
+import { Link2, Link2Off } from 'lucide-react';
 
 export function SwarmDashboard() {
   const [prompt, setPrompt] = useState('');
@@ -28,6 +30,7 @@ export function SwarmDashboard() {
   const { stations } = useSwarmStore();
   const { manualOverride, setManualOverride } = useWorkerStore();
   const { fetchTimeline } = useTimeTravelStore();
+  const { isCollaborative, remoteApprove } = useSupabaseStore();
 
   useEffect(() => {
     if (currentWorkspace) {
@@ -89,12 +92,23 @@ export function SwarmDashboard() {
           />
 
           {isAwaitingApproval && (
-            <button 
-              onClick={() => Bridge.approveCommanderPlan()}
-              className="bg-green-600 hover:bg-green-500 text-white px-8 font-bold tracking-wider rounded border border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.5)] transition-all uppercase text-xs animate-pulse"
-            >
-              Approve Commander Plan
-            </button>
+                <div className="flex gap-4 px-4 py-2 border-t border-slate-800 bg-slate-900/40">
+                  <button 
+                    onClick={() => Bridge.approveCommanderPlan()}
+                    className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2"
+                  >
+                    Approve Plan
+                  </button>
+                  {isCollaborative && (
+                    <button 
+                      onClick={() => currentWorkspace && remoteApprove(currentWorkspace.path.replace('file://', ''))}
+                      className="px-6 py-2 bg-[#0f172a] border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg hover:bg-emerald-500/10 transition-all flex items-center gap-2"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Remote Sync
+                    </button>
+                  )}
+                </div>
           )}
 
           <button 
@@ -135,7 +149,21 @@ export function SwarmDashboard() {
                     <GraphViewer />
                     <CommanderViewer />
                   </div>
-                  <div className="flex flex-col gap-4 h-full">
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                      Swarm Station
+                    </h2>
+                    {isCollaborative ? (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                        <Link2 className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">Live Link Active</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-500/10 border border-slate-500/20 rounded-full opacity-50">
+                        <Link2Off className="w-3 h-3 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Local Only</span>
+                      </div>
+                    )}
                     <SpecViewer />
                     <SprintViewer />
                   </div>
