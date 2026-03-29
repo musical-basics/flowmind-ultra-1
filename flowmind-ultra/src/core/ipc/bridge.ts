@@ -54,4 +54,7 @@ export const Bridge = {
   toggleWorkerOverride: async (paused: boolean): Promise<void> => {
     return invoke('set_worker_override', { paused });
   },
+  manualCompilerOverride: async (workspaceId: string): Promise<void> => {
+    return invoke('manual_compiler_override', { workspaceId });
+  },
 };

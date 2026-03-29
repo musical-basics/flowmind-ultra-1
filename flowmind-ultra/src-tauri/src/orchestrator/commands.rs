@@ -35,6 +35,7 @@ pub async fn approve_commander_plan(state: tauri::State<'_, crate::orchestrator:
 }
 
 #[tauri::command]
-pub async fn manual_compiler_override(workspace_id: String) -> Result<(), String> {
+pub async fn manual_compiler_override(state: tauri::State<'_, crate::orchestrator::state::SwarmOrchestratorState>, workspace_id: String) -> Result<(), String> {
+    state.compiler_approval.notify_one();
     Ok(())
 }

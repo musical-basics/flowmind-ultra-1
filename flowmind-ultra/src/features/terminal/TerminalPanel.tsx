@@ -24,6 +24,8 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
   const sessionId = overrideId || 'primary-pty';
   const { currentWorkspace } = useWorkspaceStore();
   const [terminalState, setTerminalState] = useState<string>('Offline');
+  const [activeTab, setActiveTab] = useState<'Primary' | 'Compiler'>('Primary');
+  const compilerBufferRef = useRef<string>('');
 
   useEffect(() => {
     const isWorkerTerminal = sessionId.startsWith('worker-');
@@ -51,13 +53,23 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
     fitAddonRef.current = fitAddon;
 
     let unlisten: UnlistenFn | null = null;
+    let unlistenCompiler: UnlistenFn | null = null;
 
     const initTerminal = async () => {
       unlisten = await listen<PTYPayload>('pty-output', (event) => {
         if (event.payload.id !== sessionId) return;
         const charData = new Uint8Array(event.payload.data);
-        term.write(charData);
+        if (activeTab === 'Primary') {
+            term.write(charData);
+        }
         setTerminalState('Working');
+      });
+
+      unlistenCompiler = await listen<{ data: string }>('compiler_diagnostics_stream', (event) => {
+        compilerBufferRef.current += event.payload.data + '\r\n';
+        if (activeTab === 'Compiler') {
+            term.write(event.payload.data.replace(/\n/g, '\r\n') + '\r\n');
+        }
       });
 
       try {
@@ -95,6 +107,7 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (unlisten) unlisten();
+      if (unlistenCompiler) unlistenCompiler();
       Bridge.terminalClose(sessionId).catch(console.error);
       term.dispose();
     };
@@ -113,9 +126,23 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
                   : 'bg-slate-600'
             }`}
           />
-          <span className="text-[#22d3ee] font-bold tracking-wider uppercase">
+          <span className="text-[#22d3ee] font-bold tracking-wider uppercase flex-1">
             Agent Terminal: {terminalState}
           </span>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => { setActiveTab('Primary'); xtermRef.current?.clear(); }}
+              className={`px-3 py-1 rounded border-b-2 text-xs font-bold transition-all ${activeTab === 'Primary' ? 'text-[#22d3ee] border-[#22d3ee] bg-[#22d3ee]/10' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+            >
+              PTY Output
+            </button>
+            <button 
+              onClick={() => { setActiveTab('Compiler'); xtermRef.current?.clear(); xtermRef.current?.write(compilerBufferRef.current); }}
+              className={`px-3 py-1 rounded border-b-2 text-xs font-bold transition-all ${activeTab === 'Compiler' ? 'text-amber-500 border-amber-500 bg-amber-500/10' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+            >
+              Compiler Output
+            </button>
+          </div>
         </div>
       )}
       <div className="flex-1 w-full overflow-hidden relative">

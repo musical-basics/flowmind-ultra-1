@@ -25,6 +25,11 @@ impl ConflictManager {
         true
     }
 
+    pub async fn force_acquire_lock(&self, file: &str) {
+        let mut lock = self.active_files.lock().await;
+        lock.insert(file.to_string());
+    }
+
     pub async fn release(&self, files: &[String]) {
         let mut lock = self.active_files.lock().await;
         for file in files {

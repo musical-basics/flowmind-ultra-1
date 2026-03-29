@@ -5,12 +5,14 @@ use super::schemas::{CommanderPlan, TopologicalGraph};
 
 pub struct SwarmOrchestratorState {
     pub commander_approval: Arc<Notify>,
+    pub compiler_approval: Arc<Notify>,
 }
 
 impl SwarmOrchestratorState {
     pub fn new() -> Self {
         Self {
             commander_approval: Arc::new(Notify::new()),
+            compiler_approval: Arc::new(Notify::new()),
         }
     }
 }
@@ -24,6 +26,7 @@ pub enum SwarmState {
     Planner,
     Commander,
     Executor,
+    SelfHealing { attempt: u8, max_attempts: u8 },
     QaReviewer,
     Complete,
     Failed(String),

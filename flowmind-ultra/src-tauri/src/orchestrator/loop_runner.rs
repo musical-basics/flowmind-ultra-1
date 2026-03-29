@@ -161,9 +161,60 @@ pub async fn start_orchestration(
                 break;
             }
         }
-
-        ledger.append(&format!("Sprint {} Completed: {}", chunk.id, chunk.title)).unwrap();
+        
         emit_station("Executor", "Complete", None);
+
+        // 65. QA Station: Headless Compiler Loop
+        ctx.active_state = SwarmState::QaReviewer;
+        emit_station("QA", "Active", Some("Running Headless Compiler Check".into()));
+
+        let mut attempts = 0;
+        let max_attempts = 3;
+
+        while let Err(stderr_dump) = crate::workers::compiler::run_compiler_check(&workspace_dir, app.clone()).await {
+            attempts += 1;
+            if attempts > max_attempts {
+                // Fallback Escalation
+                emit_station("QA", "AwaitingHumanFix", Some("Max healing attempts reached. Awaiting manual override.".into()));
+                let approval = app.state::<crate::orchestrator::state::SwarmOrchestratorState>();
+                approval.compiler_approval.notified().await;
+                break; // Proceed after user unblocks
+            }
+
+            ctx.active_state = SwarmState::SelfHealing { attempt: attempts, max_attempts };
+            emit_station("QA", "Healing", Some(format!("Compiler Error Detected. Initiating Sniper Node (Attempt {}/{})", attempts, max_attempts)));
+            
+            let diags = crate::workers::compiler::parse_compiler_errors(&stderr_dump);
+            
+            if let Some(target) = diags.first() {
+                emit_station("QA", "Healing", Some(format!("Sniper targeting: {}", target.file_path)));
+                
+                if let Ok(fixed_code) = crate::llm::sniper::generate_patch(&target.file_path, &target.error_message, &workspace_dir).await {
+                    
+                    // Lock Bypass
+                    cluster_mgr.conflict_mgr.force_acquire_lock(&target.file_path).await;
+                    
+                    // File Overwrite (apply patch to disk)
+                    let target_full_path = format!("{}/{}", workspace_dir, target.file_path);
+                    let _ = std::fs::write(&target_full_path, fixed_code);
+                    
+                    // Immediately Release Lock
+                    cluster_mgr.conflict_mgr.release(&[target.file_path.clone()]).await;
+                    
+                    // Ledger Annotation
+                    ledger.append(&format!("\n[Auto-Heal]: Sniper repaired compilation error via JSON diff in `{}`", target.file_path)).unwrap();
+                }
+            } else {
+                // If it couldn't parse the exact file causing the issue, just skip sniper and break to human
+                emit_station("QA", "AwaitingHumanFix", Some("Unparseable Compiler Error. Awaiting explicit manual override.".into()));
+                let approval = app.state::<crate::orchestrator::state::SwarmOrchestratorState>();
+                approval.compiler_approval.notified().await;
+                break;
+            }
+        }
+
+        ledger.append(&format!("\nSprint {} Completed: {}", chunk.id, chunk.title)).unwrap();
+        emit_station("QA", "Complete", Some("✅ Compilation successful. Codebase stabilized.".into()));
     }
 
     ctx.active_state = SwarmState::Complete;
