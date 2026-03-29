@@ -1,6 +1,7 @@
 mod db;
 mod pty;
 mod llm;
+mod orchestrator;
 
 use tauri::Manager;
 
