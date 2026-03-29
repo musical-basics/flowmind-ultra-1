@@ -28,4 +28,7 @@ export const Bridge = {
   terminalClose: async (id: string): Promise<void> => {
     return invoke('terminal_close', { id });
   },
+  llmFetchModels: async (apiKey: string): Promise<any> => {
+    return invoke('fetch_models', { apiKey });
+  },
 };

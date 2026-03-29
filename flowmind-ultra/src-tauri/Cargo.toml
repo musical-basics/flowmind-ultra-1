@@ -40,3 +40,4 @@ tauri-plugin-dialog = "2.2"
 wezterm-term = { package = "tattoy-wezterm-term", version = "0.1.0-fork.5" }
 regex = "1.10"
 strip-ansi-escapes = "0.2"
+ignore = "0.4"
