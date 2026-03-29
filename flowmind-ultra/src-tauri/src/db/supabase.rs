@@ -10,6 +10,7 @@ pub struct SwarmRunUpdate {
     pub is_commander_approved: bool,
     pub is_compiler_approved: bool,
     pub prompt: Option<String>,
+    pub ledger_snapshot: Option<String>,
 }
 
 pub struct SupabaseClient {

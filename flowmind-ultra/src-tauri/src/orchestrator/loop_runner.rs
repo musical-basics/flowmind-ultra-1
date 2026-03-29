@@ -117,7 +117,12 @@ pub async fn start_orchestration(
 
         // Node 4: Planner
         ctx.active_state = SwarmState::Planner;
-        emit_station("Planner", "Active", Some(format!("Planning Chunk {}", chunk.id)));
+        emit_station("All Nodes", "Complete", Some(format!("Sprint {} Finalized", chunk.id)));
+        
+        // EPIC 5: Final Ledger Uplink
+        if let Some(sb) = app.try_state::<Arc<SupabaseClient>>() {
+            let _ = ledger.uplink_to_supabase(&sb, workspace_dir.clone()).await;
+        }
         
         // RAG Retrieval
         let mut memory_context = None;
