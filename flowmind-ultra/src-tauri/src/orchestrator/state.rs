@@ -1,5 +1,19 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Notify;
 use super::schemas::{CommanderPlan, TopologicalGraph};
+
+pub struct SwarmOrchestratorState {
+    pub commander_approval: Arc<Notify>,
+}
+
+impl SwarmOrchestratorState {
+    pub fn new() -> Self {
+        Self {
+            commander_approval: Arc::new(Notify::new()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SwarmState {

@@ -8,6 +8,7 @@ pub struct ClusterManager {
     queue: Arc<Mutex<Vec<WorkerTask>>>,
     pub conflict_mgr: Arc<ConflictManager>,
     pub workers: Arc<Mutex<Vec<Arc<Mutex<ExecutionWorker>>>>>,
+    pub is_paused: Arc<Mutex<bool>>,
     app: AppHandle,
 }
 
@@ -17,6 +18,7 @@ impl ClusterManager {
             queue: Arc::new(Mutex::new(Vec::new())),
             conflict_mgr: Arc::new(ConflictManager::new()),
             workers: Arc::new(Mutex::new(Vec::new())),
+            is_paused: Arc::new(Mutex::new(false)),
             app: app.clone(),
         });
 
@@ -48,6 +50,8 @@ impl ClusterManager {
     }
 
     pub async fn try_dispatch(&self) {
+        if *self.is_paused.lock().await { return; }
+        
         let mut q = self.queue.lock().await;
         if q.is_empty() { return; }
 

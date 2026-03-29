@@ -4,13 +4,13 @@ import { GraphViewer } from './GraphViewer';
 import { CommanderViewer } from './CommanderViewer';
 import { SpecViewer } from './SpecViewer';
 import { SprintViewer } from './SprintViewer';
-import { TerminalPanel } from '../terminal/TerminalPanel';
 import { WorkerDashboard } from '../workers/WorkerDashboard';
 import { ModelSelector } from '../chat/ModelSelector';
 import { Bridge } from '../../core/ipc/bridge';
 import { useLLMStore } from '../../stores/useLLMStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useSwarmStore } from '../../stores/useSwarmStore';
+import { useWorkerStore } from '../../stores/useWorkerStore';
 import { FileTree } from '../workspace/FileTree';
 
 export function SwarmDashboard() {
@@ -20,8 +20,10 @@ export function SwarmDashboard() {
   const { agents } = useLLMStore();
   const { currentWorkspace } = useWorkspaceStore();
   const { stations } = useSwarmStore();
+  const { manualOverride, setManualOverride } = useWorkerStore();
 
   const isComplete = stations.find((s) => s.id === 'Complete')?.status === 'Complete';
+  const isAwaitingApproval = stations.find((s) => s.id === 'Commander')?.status === 'AwaitingApproval';
 
   const handleStartSwarm = async () => {
     if (!prompt.trim() || !currentWorkspace) return;
@@ -69,6 +71,23 @@ export function SwarmDashboard() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+
+          {isAwaitingApproval && (
+            <button 
+              onClick={() => Bridge.approveCommanderPlan()}
+              className="bg-green-600 hover:bg-green-500 text-white px-8 font-bold tracking-wider rounded border border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.5)] transition-all uppercase text-xs animate-pulse"
+            >
+              Approve Commander Plan
+            </button>
+          )}
+
+          <button 
+            onClick={() => setManualOverride(!manualOverride)}
+            className={`px-8 font-bold tracking-wider rounded border transition-all uppercase text-xs ${manualOverride ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600'}`}
+          >
+            {manualOverride ? 'Override Active' : 'Manual Override'}
+          </button>
+
           <button 
             onClick={handleStartSwarm}
             disabled={working && !isComplete}

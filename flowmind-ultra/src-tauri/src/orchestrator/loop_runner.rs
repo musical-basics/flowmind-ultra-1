@@ -102,6 +102,11 @@ pub async fn start_orchestration(
         emit_station("Commander", "Active", Some("Routing dependencies...".into()));
         let plan = run_commander(&client, &executor_model, &graph).await;
         chunk.execution_plan = Some(plan.clone());
+        emit_station("Commander", "AwaitingApproval", Some("Awaiting your authorization".into()));
+
+        // 90. Suspend execution until the user manually triggers Tauri command: approve_commander_plan
+        let approval = app.state::<crate::orchestrator::state::SwarmOrchestratorState>();
+        approval.commander_approval.notified().await;
         emit_station("Commander", "Complete", None);
 
         // Node 6: Executor

@@ -46,4 +46,10 @@ export const Bridge = {
       executorModel 
     });
   },
+  approveCommanderPlan: async (): Promise<void> => {
+    return invoke('approve_commander_plan');
+  },
+  toggleWorkerOverride: async (paused: boolean): Promise<void> => {
+    return invoke('set_worker_override', { paused });
+  },
 };

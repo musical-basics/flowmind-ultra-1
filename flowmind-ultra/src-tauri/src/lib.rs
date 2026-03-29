@@ -39,6 +39,9 @@ pub fn run() {
         });
         app.manage(cluster_manager);
 
+        let orchestrator_state = orchestrator::state::SwarmOrchestratorState::new();
+        app.manage(orchestrator_state);
+
         Ok(())
     })
     .plugin(tauri_plugin_fs::init())
@@ -60,7 +63,10 @@ pub fn run() {
         pty::commands::snapshot_lines,
         llm::commands::fetch_models,
         llm::commands::sanitize_llm_json,
-        orchestrator::commands::start_swarm
+        orchestrator::commands::start_swarm,
+        orchestrator::commands::approve_commander_plan,
+        workers::commands::set_worker_override,
+        workers::commands::exec_global_script
     ])
     .on_window_event(|window, event| {
         if let tauri::WindowEvent::Destroyed = event {

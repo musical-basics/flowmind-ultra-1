@@ -26,3 +26,9 @@ pub async fn start_swarm(
     
     Ok(())
 }
+
+#[tauri::command]
+pub async fn approve_commander_plan(state: tauri::State<'_, crate::orchestrator::state::SwarmOrchestratorState>) -> Result<(), String> {
+    state.commander_approval.notify_one();
+    Ok(())
+}
