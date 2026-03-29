@@ -2,6 +2,7 @@ mod db;
 mod pty;
 mod llm;
 mod orchestrator;
+mod workers;
 
 use tauri::Manager;
 
@@ -32,6 +33,11 @@ pub fn run() {
         
         let pty_manager = pty::manager::TerminalManager::new();
         app.manage(pty_manager);
+
+        let cluster_manager = tauri::async_runtime::block_on(async { 
+            workers::manager::ClusterManager::init(app.handle().clone()).await 
+        });
+        app.manage(cluster_manager);
 
         Ok(())
     })

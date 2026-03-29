@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { Bridge } from '../../core/ipc/bridge';
 import '@xterm/xterm/css/xterm.css';
 
@@ -15,11 +16,16 @@ interface TerminalStatePayload {
   state: string;
 }
 
-export function TerminalPanel() {
+interface TerminalProps {
+  overrideId?: string;
+  hideHeader?: boolean;
+}
+
+export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const sessionId = 'primary-pty';
+  const sessionId = overrideId || 'primary-pty';
   const [terminalState, setTerminalState] = useState<string>('Offline');
 
   useEffect(() => {
@@ -99,20 +105,22 @@ export function TerminalPanel() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0f] relative w-full">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-[#22d3ee]/20 bg-[#0a0a0f] text-xs font-mono shrink-0">
-        <span 
-          className={`w-2 h-2 rounded-full ${
-            terminalState === 'Working' 
-              ? 'bg-[#a855f7] animate-pulse shadow-[0_0_8px_#a855f7]' 
-              : terminalState === 'Online' 
-                ? 'bg-[#22d3ee] shadow-[0_0_8px_#22d3ee]' 
-                : 'bg-slate-600'
-          }`}
-        />
-        <span className="text-[#22d3ee] font-bold tracking-wider uppercase">
-          Agent Terminal: {terminalState}
-        </span>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-[#22d3ee]/20 bg-[#0a0a0f] text-xs font-mono shrink-0">
+          <span 
+            className={`w-2 h-2 rounded-full ${
+              terminalState === 'Working' 
+                ? 'bg-[#a855f7] animate-pulse shadow-[0_0_8px_#a855f7]' 
+                : terminalState === 'Online' 
+                  ? 'bg-[#22d3ee] shadow-[0_0_8px_#22d3ee]' 
+                  : 'bg-slate-600'
+            }`}
+          />
+          <span className="text-[#22d3ee] font-bold tracking-wider uppercase">
+            Agent Terminal: {terminalState}
+          </span>
+        </div>
+      )}
       <div className="flex-1 w-full overflow-hidden relative">
         <div ref={terminalRef} className="absolute inset-0 p-2" />
       </div>

@@ -1,6 +1,9 @@
-use tauri::{AppHandle, Emitter};
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
 use crate::llm::client::LlmClient;
 use crate::llm::ledger::LedgerManager;
+use crate::workers::manager::ClusterManager;
+use crate::workers::executor::WorkerTask;
 use super::state::{SwarmContext, SwarmState, SprintChunk};
 use super::nodes::*;
 
@@ -101,17 +104,52 @@ pub async fn start_orchestration(
         chunk.execution_plan = Some(plan.clone());
         emit_station("Commander", "Complete", None);
 
-        /* 
-          // Future Phase 8 integration
-          ctx.active_state = SwarmState::Executor;
-          emit_station("Executor", "Active", Some("Deploying agents...".into()));
-          run_executor_clusters(...).await;
-          emit_station("Executor", "Complete", None);
-        */
+        // Node 6: Executor
+        ctx.active_state = SwarmState::Executor;
+        emit_station("Executor", "Active", Some("Deploying agents into Worker Cluster...".into()));
+        
+        let cluster_mgr = app.state::<Arc<ClusterManager>>();
+        let mut tasks = Vec::new();
+        
+        if let Some(plan) = &chunk.execution_plan {
+            for wc in &plan.wizard_clusters {
+                tasks.push(WorkerTask {
+                    id: format!("wizard-{}-{}", chunk.id, wc.title),
+                    title: wc.title.clone(),
+                    files: wc.files.clone(),
+                    status: "Pending".into(),
+                });
+            }
+            for sp in &plan.specialist_pairs {
+                tasks.push(WorkerTask {
+                    id: format!("specialist-{}-{}", chunk.id, sp.producer_file),
+                    title: format!("Pair: {} -> {}", sp.producer_file, sp.consumer_file),
+                    files: vec![sp.producer_file.clone(), sp.consumer_file.clone()],
+                    status: "Pending".into(),
+                });
+            }
+            for sf in &plan.swarm_files {
+                tasks.push(WorkerTask {
+                    id: format!("swarm-file-{}-{}", chunk.id, sf.filepath),
+                    title: format!("Config: {}", sf.filepath),
+                    files: vec![sf.filepath.clone()],
+                    status: "Pending".into(),
+                });
+            }
+        }
 
-        // Simulate execution delay for UI testing
-        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+        cluster_mgr.enqueue(tasks).await;
+
+        // Block progression until cluster queue is fully drained
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            if cluster_mgr.is_idle().await {
+                break;
+            }
+        }
+
         ledger.append(&format!("Sprint {} Completed: {}", chunk.id, chunk.title)).unwrap();
+        emit_station("Executor", "Complete", None);
     }
 
     ctx.active_state = SwarmState::Complete;

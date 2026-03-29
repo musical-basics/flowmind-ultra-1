@@ -5,6 +5,7 @@ import { CommanderViewer } from './CommanderViewer';
 import { SpecViewer } from './SpecViewer';
 import { SprintViewer } from './SprintViewer';
 import { TerminalPanel } from '../terminal/TerminalPanel';
+import { WorkerDashboard } from '../workers/WorkerDashboard';
 import { ModelSelector } from '../chat/ModelSelector';
 import { Bridge } from '../../core/ipc/bridge';
 import { useLLMStore } from '../../stores/useLLMStore';
@@ -15,11 +16,12 @@ import { FileTree } from '../workspace/FileTree';
 export function SwarmDashboard() {
   const [prompt, setPrompt] = useState('');
   const [working, setWorking] = useState(false);
+  const [viewTab, setViewTab] = useState<'agents' | 'workers'>('agents');
   const { agents } = useLLMStore();
   const { currentWorkspace } = useWorkspaceStore();
   const { stations } = useSwarmStore();
 
-  const isComplete = stations.find(s => s.id === 'Complete')?.status === 'Complete';
+  const isComplete = stations.find((s) => s.id === 'Complete')?.status === 'Complete';
 
   const handleStartSwarm = async () => {
     if (!prompt.trim() || !currentWorkspace) return;
@@ -38,17 +40,16 @@ export function SwarmDashboard() {
 
   return (
     <div className="flex h-screen w-full bg-[#050508] text-slate-300">
-      
       {/* Left Sidebar: File Tree */}
       <div className="w-64 border-r border-panel-border bg-panel shrink-0 flex flex-col">
-          <div className="h-12 flex items-center px-4 border-b border-panel-border shrink-0">
-              <span className="font-bold text-sm tracking-wider uppercase text-neon-cyan drop-shadow-[0_0_8px_rgba(34,211,238,0.5)] flex items-center gap-2">
-                Flowmind <span className="text-neon-purple">Ultra</span>
-              </span>
-          </div>
-          <div className="flex-1 overflow-auto">
-              <FileTree />
-          </div>
+        <div className="h-12 flex items-center px-4 border-b border-panel-border shrink-0">
+          <span className="font-bold text-sm tracking-wider uppercase text-neon-cyan drop-shadow-[0_0_8px_rgba(34,211,238,0.5)] flex items-center gap-2">
+            Flowmind <span className="text-neon-purple">Ultra</span>
+          </span>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <FileTree />
+        </div>
       </div>
 
       {/* Main Content */}
@@ -77,19 +78,27 @@ export function SwarmDashboard() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-[400px]">
-          <div className="flex flex-col gap-4 h-full">
-            <GraphViewer />
-            <CommanderViewer />
-          </div>
-          
-          <div className="flex flex-col rounded-lg overflow-hidden border border-[#2e303a] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#0a0a0f] h-[400px]">
-            <TerminalPanel />
+        <div className="flex flex-col flex-1 min-h-[400px]">
+          <div className="flex gap-4 mb-2 shrink-0">
+            <button onClick={() => setViewTab('agents')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'agents' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Execution Graph</button>
+            <button onClick={() => setViewTab('workers')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'workers' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Worker Clusters</button>
           </div>
 
-          <div className="flex flex-col gap-4 h-full">
-            <SpecViewer />
-            <SprintViewer />
+          <div className="flex-1 w-full bg-[#0a0a0f] border border-[#2e303a] rounded-lg p-4 h-full relative">
+            {viewTab === 'agents' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full shrink-0">
+                <div className="flex flex-col gap-4 h-full">
+                  <GraphViewer />
+                  <CommanderViewer />
+                </div>
+                <div className="flex flex-col gap-4 h-full">
+                  <SpecViewer />
+                  <SprintViewer />
+                </div>
+              </div>
+            ) : (
+              <WorkerDashboard />
+            )}
           </div>
         </div>
       </div>
