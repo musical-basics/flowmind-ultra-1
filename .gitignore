@@ -2,6 +2,8 @@
 *repomix*.xml
 repomix*.xml
 *repomix*.md
+!repomix.config.json
+
 
 # Node
 node_modules/

@@ -3,19 +3,26 @@ use crate::llm::client::{LlmClient, ChatRequest, ChatMessage};
 use super::schemas::{OverseerOutput, TopologicalGraph, CommanderPlan, WizardCluster};
 use crate::llm::sanitizer::sanitize_json;
 
-pub fn run_origin(workspace_path: &str, prompt: &str) -> std::io::Result<String> {
+use crate::llm::flattener::flatten_workspace;
+
+pub fn run_origin(workspace_path: &str, prompt: &str, ignored_dirs: Option<Vec<String>>) -> std::io::Result<String> {
     let ts = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
     let dir = format!("{}/_swarm_artifacts/run_{}", workspace_path, ts);
     std::fs::create_dir_all(&dir)?;
     std::fs::write(format!("{}/prompt.md", dir), prompt)?;
+    
+    // Flatten Workspace
+    let context = flatten_workspace(workspace_path, ignored_dirs).unwrap_or_else(|e| format!("Failed to read context: {}", e));
+    std::fs::write(format!("{}/context.md", dir), context)?;
+
     Ok(dir)
 }
 
-pub async fn run_spec_factory(client: &LlmClient, model: &str, prompt: &str) -> Result<String, String> {
+pub async fn run_spec_factory(client: &LlmClient, model: &str, prompt: &str, codebase_context: &str) -> Result<String, String> {
     let req = ChatRequest {
         model: model.to_string(),
         messages: vec![
-            ChatMessage { role: "system".into(), content: "You are the SpecFactory Node. Write a highly detailed Markdown PRD (Product Requirements Document) outlining exactly how to build what the user asked for. Include a 10-step concrete execution plan.".into() },
+            ChatMessage { role: "system".into(), content: "You are the SpecFactory Node. Write a highly detailed Markdown PRD (Product Requirements Document) outlining exactly how to build what the user asked for. Include a 10-step concrete execution plan.\n\nHere is the current Repository Codebase:\n".to_string() + codebase_context },
             ChatMessage { role: "user".into(), content: prompt.to_string() }
         ],
         response_format: None,

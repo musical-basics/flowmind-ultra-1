@@ -12,12 +12,14 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useSwarmStore } from '../../stores/useSwarmStore';
 import { useWorkerStore } from '../../stores/useWorkerStore';
 import { FileTree } from '../workspace/FileTree';
+import { FlattenerSettingsPanel } from './FlattenerSettingsPanel';
 
 export function SwarmDashboard() {
   const [prompt, setPrompt] = useState('');
   const [working, setWorking] = useState(false);
   const [viewTab, setViewTab] = useState<'agents' | 'workers'>('agents');
-  const { agents } = useLLMStore();
+  const [showSettings, setShowSettings] = useState(false);
+  const { agents, ignoredDirectories } = useLLMStore();
   const { currentWorkspace } = useWorkspaceStore();
   const { stations } = useSwarmStore();
   const { manualOverride, setManualOverride } = useWorkerStore();
@@ -36,7 +38,8 @@ export function SwarmDashboard() {
       prompt,
       agents.overseer.modelId,
       agents.planner.modelId,
-      agents.executor.modelId
+      agents.executor.modelId,
+      ignoredDirectories
     );
   };
 
@@ -63,6 +66,8 @@ export function SwarmDashboard() {
           <ModelSelector agentRole="planner" />
           <ModelSelector agentRole="executor" />
         </div>
+
+        {showSettings && <FlattenerSettingsPanel />}
 
         <div className="flex gap-2 shrink-0">
           <input 
@@ -94,6 +99,14 @@ export function SwarmDashboard() {
             className="bg-[#a855f7] hover:bg-[#b975f8] text-white px-8 font-bold tracking-wider rounded border border-[#d8b4fe] shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all disabled:opacity-50 uppercase text-xs"
           >
             {working && !isComplete ? 'Executing...' : 'Engage Swarm'}
+          </button>
+
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 font-bold rounded border border-slate-600 transition-colors"
+            title="Toggle Flattener Settings"
+          >
+            ⚙️
           </button>
         </div>
 

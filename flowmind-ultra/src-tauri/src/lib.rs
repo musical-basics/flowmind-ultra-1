@@ -70,9 +70,11 @@ pub fn run() {
     ])
     .on_window_event(|window, event| {
         if let tauri::WindowEvent::Destroyed = event {
-            let manager = window.state::<pty::manager::TerminalManager>();
+            let pty_manager = window.state::<pty::manager::TerminalManager>();
+            let cluster_manager = window.state::<std::sync::Arc<workers::manager::ClusterManager>>();
             tauri::async_runtime::block_on(async {
-                manager.kill_all().await;
+                pty_manager.kill_all().await;
+                cluster_manager.cleanup().await;
             });
         }
     })

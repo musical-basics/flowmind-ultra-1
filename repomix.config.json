@@ -1,0 +1,51 @@
+{
+  "output": {
+    "filePath": "flowmind-repomix.xml",
+    "style": "xml",
+    "parsableStyle": true,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false
+  },
+  "include": [
+    "**/*"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "repomix.config.json",
+      "pnpm-lock.yaml",
+      "Cargo.lock",
+      "tsconfig.json",
+      "tsconfig.node.json",
+      "tsconfig.app.json",
+      "vite.config.ts",
+      "eslint.config.js",
+      "package.json",
+      "**/public/**",
+      "**/assets/**",
+      "**/fonts/**",
+      "**/images/**",
+      "*.svg",
+      "*.png",
+      "*.ico",
+      "**/.tests/**",
+      "**/.vscode/**",
+      "**/.idea/**",
+      "**/.DS_Store",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/target/**",
+      "*.log"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

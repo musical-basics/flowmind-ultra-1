@@ -1,5 +1,6 @@
 use tauri::{AppHandle, Emitter};
 use crate::pty::session::TerminalSession;
+use crate::llm::client::{LlmClient, ChatRequest, ChatMessage};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -10,6 +11,7 @@ pub struct WorkerTask {
     pub files: Vec<String>,
     pub status: String,
     pub cwd: String,
+    pub model: String,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -55,14 +57,108 @@ impl ExecutionWorker {
         }
 
         if let Some(pty) = &self.pty_session {
-            // 75. Token limiting simulated delay
+            // Token limiting simulated delay
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            let cmd = format!("echo 'Deploying Multi-Agent Cluster for -> {}'\nsleep 3\necho 'Agent File Access: {}'\nsleep 2\necho 'Agent Execution Completed.'\n", task.title, task.files.join(", "));
+            
+            let client = LlmClient::new(
+                std::env::var("OPENROUTER_API_KEY").ok(),
+                std::env::var("ANTHROPIC_API_KEY").ok()
+            );
+
+            let mut file_context = String::new();
+            for file in &task.files {
+                let path = format!("{}/{}", task.cwd, file);
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    file_context.push_str(&format!("--- {} ---\n{}\n", file, content));
+                }
+            }
+
+            let sys_prompt = "You are the Agent Worker Node. You must generate a single bash execution script to fulfill the requested task on the provided context files. Generate ONLY a valid bash script that patches, executes, or modifies the files using standard bash commands (cat << 'EOF' > file.txt, sed, et al). Start directly with the commands. Your entire output goes straight into a bash terminal. Do not use code blocks if possible. If you must use markdown codeblocks to wrap your bash, limit it to one block.";
+            let user_prompt = format!("Task: {}\nFiles Context:\n{}", task.title, file_context);
+
+            let req = ChatRequest {
+                model: task.model.clone(),
+                messages: vec![
+                    ChatMessage { role: "system".into(), content: sys_prompt.into() },
+                    ChatMessage { role: "user".into(), content: user_prompt }
+                ],
+                response_format: None,
+                temperature: Some(0.2),
+            };
+
+            let mut script = String::new();
+            if let Ok((res, _)) = client.complete(req).await {
+                script = res;
+            } else {
+                script = format!("echo 'Failed to generate code payload for {}'", task.title);
+            }
+
+            // Cleanup potential markdown blocks
+            let clean_script = script.replace("```bash\n", "").replace("```sh\n", "").replace("```\n", "").replace("```", "");
+            
+            let cmd = format!("echo 'Executing LLM Payload for {}'\n{}\n", task.title, clean_script);
             pty.lock().await.write(cmd.as_bytes())?;
         }
 
-        // Simulated deep execution duration
-        tokio::time::sleep(tokio::time::Duration::from_secs(6)).await;
+        // Wait for script execution
+        tokio::time::sleep(tokio::time::Duration::from_secs(12)).await;
+
+        // --- QA Loop ---
+        if let Some(pty) = &self.pty_session {
+            let pty_lock = pty.lock().await;
+            let output = pty_lock.output_buffer.lock().await.clone();
+            drop(pty_lock);
+
+            let re = regex::Regex::new(r"(?i)(error:|command not found|failed|exception|traceback|panic)").unwrap();
+            if re.is_match(&output) {
+                let _ = self.app.emit("station_update", crate::orchestrator::loop_runner::StationUpdate {
+                    station: "QA".to_string(),
+                    status: "Active".to_string(),
+                    detail: Some("Errors detected in xterm. Auto-Healing...".to_string()),
+                });
+
+                let tail: String = output.lines().rev().take(30).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+                
+                let sys_prompt = "You are the QA Fixer Node. The previous command failed. Fix it by generating a new bash script. Start directly with commands. Avoid code blocks. Output must be a valid raw bash script.";
+                let user_prompt = format!("Task: {}\nPrevious Terminal Output / Error:\n{}", task.title, tail);
+
+                let req = ChatRequest {
+                    model: task.model.clone(),
+                    messages: vec![
+                        ChatMessage { role: "system".into(), content: sys_prompt.into() },
+                        ChatMessage { role: "user".into(), content: user_prompt }
+                    ],
+                    response_format: None,
+                    temperature: Some(0.2),
+                };
+
+                let client = LlmClient::new(std::env::var("OPENROUTER_API_KEY").ok(), std::env::var("ANTHROPIC_API_KEY").ok());
+                if let Ok((res, _)) = client.complete(req).await {
+                    let fix_script = res.replace("```bash\n", "").replace("```sh\n", "").replace("```\n", "").replace("```", "");
+                    
+                    let pty_lock = pty.lock().await;
+                    pty_lock.output_buffer.lock().await.clear();
+                    let cmd = format!("echo 'Executing Auto-Heal Fix'\n{}\n", fix_script);
+                    pty_lock.write(cmd.as_bytes())?;
+                    drop(pty_lock);
+
+                    tokio::time::sleep(tokio::time::Duration::from_secs(12)).await;
+                    
+                    let _ = self.app.emit("station_update", crate::orchestrator::loop_runner::StationUpdate {
+                        station: "QA".to_string(),
+                        status: "Complete".to_string(),
+                        detail: Some("Auto-heal complete".to_string()),
+                    });
+                }
+            } else {
+                let _ = self.app.emit("station_update", crate::orchestrator::loop_runner::StationUpdate {
+                    station: "QA".to_string(),
+                    status: "Complete".to_string(),
+                    detail: Some("No errors detected. Passed.".to_string()),
+                });
+            }
+        }
+        // --- End QA Loop ---
 
         let mut t = self.current_task.lock().await;
         *t = None;

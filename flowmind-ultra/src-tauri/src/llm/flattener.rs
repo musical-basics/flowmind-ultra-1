@@ -2,10 +2,25 @@ use ignore::WalkBuilder;
 use std::fs;
 use std::path::Path;
 
-pub fn flatten_workspace<P: AsRef<Path>>(dir: P) -> Result<String, String> {
+pub fn flatten_workspace<P: AsRef<Path>>(dir: P, ignored_dirs: Option<Vec<String>>) -> Result<String, String> {
     let mut output = String::new();
     let root = dir.as_ref();
-    for result in WalkBuilder::new(root).hidden(false).build() {
+    
+    let mut builder = WalkBuilder::new(root);
+    builder.hidden(false);
+    
+    if let Some(ignored) = ignored_dirs {
+        builder.filter_entry(move |entry| {
+            if let Some(name) = entry.file_name().to_str() {
+                if ignored.contains(&name.to_string()) {
+                    return false;
+                }
+            }
+            true
+        });
+    }
+
+    for result in builder.build() {
         match result {
             Ok(entry) => {
                 if !entry.file_type().map_or(false, |ft| ft.is_dir()) {

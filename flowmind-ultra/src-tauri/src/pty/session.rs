@@ -31,6 +31,7 @@ pub struct TerminalSession {
     pub master: Box<dyn MasterPty + Send>,
     pub child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
     pub state: Arc<Mutex<TerminalState>>,
+    pub output_buffer: Arc<Mutex<String>>,
 }
 
 impl TerminalSession {
@@ -52,12 +53,14 @@ impl TerminalSession {
         let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
         let child_arc = Arc::new(Mutex::new(child));
         let state = Arc::new(Mutex::new(TerminalState::Connecting));
+        let output_buffer = Arc::new(Mutex::new(String::new()));
 
         let session = Arc::new(Mutex::new(TerminalSession {
             id: id.clone(),
             master: pair.master,
             child: child_arc.clone(),
             state: state.clone(),
+            output_buffer: output_buffer.clone(),
         }));
 
         let _ = app.emit("pty-state", TerminalStatePayload { id: id.clone(), state: "Connecting".to_string() });
@@ -76,8 +79,12 @@ impl TerminalSession {
                 match reader.read(&mut buf) {
                     Ok(n) if n > 0 => {
                         let data = buf[..n].to_vec();
+                        let text = String::from_utf8_lossy(&data).into_owned();
+                        let buffer_clone = output_buffer.clone();
                         tauri::async_runtime::block_on(async {
                             stability_clone.notify_activity(n).await;
+                            let mut b = buffer_clone.lock().await;
+                            b.push_str(&text);
                         });
                         // 26. Broadcast terminal output chunk at 60fps
                         let _ = app_clone.emit("pty-output", PTYPayload {

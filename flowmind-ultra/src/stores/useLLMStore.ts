@@ -14,8 +14,10 @@ interface LLMState {
     executor: LLMConfig;
   };
   models: any[];
+  ignoredDirectories: string[];
   setApiKey: (key: string) => void;
   setAgentConfig: (agent: 'overseer' | 'planner' | 'executor', config: LLMConfig) => void;
+  setIgnoredDirectories: (dirs: string[]) => void;
   fetchModels: () => Promise<void>;
 }
 
@@ -27,10 +29,12 @@ export const useLLMStore = create<LLMState>((set, get) => ({
     executor: { provider: 'openrouter', modelId: 'anthropic/claude-3.5-sonnet' },
   },
   models: [],
+  ignoredDirectories: ['node_modules', '.next', 'target', '.git', 'dist', 'build'],
   setApiKey: (key) => set({ apiKey: key }),
   setAgentConfig: (agent, config) => set((state) => ({
     agents: { ...state.agents, [agent]: config }
   })),
+  setIgnoredDirectories: (dirs) => set({ ignoredDirectories: dirs }),
   fetchModels: async () => {
     const { apiKey } = get();
     try {

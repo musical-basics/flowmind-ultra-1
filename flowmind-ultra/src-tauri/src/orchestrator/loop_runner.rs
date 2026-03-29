@@ -28,6 +28,7 @@ pub async fn start_orchestration(
     overseer_model: String,
     planner_model: String,
     executor_model: String,
+    ignored_dirs: Option<Vec<String>>,
 ) -> Result<(), String> {
     log::info!("Starting Swarm Orchestration in {}", workspace_dir);
 
@@ -51,14 +52,16 @@ pub async fn start_orchestration(
     // Node 1: Origin
     ctx.active_state = SwarmState::Origin;
     emit_station("Origin", "Active", None);
-    let artifact_dir = run_origin(&workspace_dir, &prompt).map_err(|e| e.to_string())?;
+    let artifact_dir = run_origin(&workspace_dir, &prompt, ignored_dirs.clone()).map_err(|e| e.to_string())?;
     ctx.artifact_dir = Some(artifact_dir.clone());
     emit_station("Origin", "Complete", None);
+
+    let codebase_context = std::fs::read_to_string(format!("{}/context.md", artifact_dir)).unwrap_or_default();
 
     // Node 2: SpecFactory
     ctx.active_state = SwarmState::SpecFactory;
     emit_station("SpecFactory", "Active", None);
-    let prd = run_spec_factory(&client, &overseer_model, &prompt).await?;
+    let prd = run_spec_factory(&client, &overseer_model, &prompt, &codebase_context).await?;
     std::fs::write(format!("{}/prd.md", artifact_dir), &prd).unwrap();
     ctx.prd_markdown = Some(prd.clone());
     emit_station("SpecFactory", "Complete", None);
@@ -124,6 +127,7 @@ pub async fn start_orchestration(
                     files: wc.files.clone(),
                     status: "Pending".into(),
                     cwd: workspace_dir.clone(),
+                    model: executor_model.clone(),
                 });
             }
             for sp in &plan.specialist_pairs {
@@ -133,6 +137,7 @@ pub async fn start_orchestration(
                     files: vec![sp.producer_file.clone(), sp.consumer_file.clone()],
                     status: "Pending".into(),
                     cwd: workspace_dir.clone(),
+                    model: executor_model.clone(),
                 });
             }
             for sf in &plan.swarm_files {
@@ -142,6 +147,7 @@ pub async fn start_orchestration(
                     files: vec![sf.filepath.clone()],
                     status: "Pending".into(),
                     cwd: workspace_dir.clone(),
+                    model: executor_model.clone(),
                 });
             }
         }

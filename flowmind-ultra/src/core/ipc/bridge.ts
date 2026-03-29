@@ -36,14 +36,16 @@ export const Bridge = {
     prompt: string, 
     overseerModel: string, 
     plannerModel: string, 
-    executorModel: string
+    executorModel: string,
+    ignoredDirs: string[]
   ): Promise<void> => {
     return invoke('start_swarm', { 
       workspaceDir, 
       prompt, 
       overseerModel, 
       plannerModel, 
-      executorModel 
+      executorModel,
+      ignoredDirs
     });
   },
   approveCommanderPlan: async (): Promise<void> => {
