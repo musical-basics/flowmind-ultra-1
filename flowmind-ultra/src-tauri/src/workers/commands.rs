@@ -11,12 +11,13 @@ pub async fn set_worker_override(manager: State<'_, Arc<ClusterManager>>, paused
 }
 
 #[tauri::command]
-pub async fn exec_global_script(manager: State<'_, Arc<ClusterManager>>, script: String) -> Result<(), String> {
+pub async fn exec_global_script(manager: State<'_, Arc<ClusterManager>>, script: String, cwd: String) -> Result<(), String> {
     manager.enqueue(vec![WorkerTask {
         id: "global-override".into(),
         title: format!("Global Execute: {}", script),
         files: vec![],
-        status: "Pending".into()
+        status: "Pending".into(),
+        cwd,
     }]).await;
     Ok(())
 }

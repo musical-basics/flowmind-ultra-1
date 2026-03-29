@@ -9,6 +9,7 @@ pub struct WorkerTask {
     pub title: String,
     pub files: Vec<String>,
     pub status: String,
+    pub cwd: String,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -49,7 +50,7 @@ impl ExecutionWorker {
         });
 
         if self.pty_session.is_none() {
-            let session = TerminalSession::spawn(format!("worker-{}", self.id), self.app.clone())?;
+            let session = TerminalSession::spawn(format!("worker-{}", self.id), task.cwd.clone(), self.app.clone())?;
             self.pty_session = Some(session);
         }
 

@@ -3,8 +3,8 @@ use crate::pty::manager::TerminalManager;
 use crate::pty::session::TerminalSession;
 
 #[tauri::command]
-pub async fn terminal_create(app: AppHandle, manager: State<'_, TerminalManager>, id: String) -> Result<(), String> {
-    let session = TerminalSession::spawn(id.clone(), app)?;
+pub async fn terminal_create(app: AppHandle, manager: State<'_, TerminalManager>, id: String, cwd: String) -> Result<(), String> {
+    let session = TerminalSession::spawn(id.clone(), cwd, app)?;
     manager.add_session(id, session).await;
     Ok(())
 }

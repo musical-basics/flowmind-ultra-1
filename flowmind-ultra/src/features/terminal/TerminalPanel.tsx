@@ -4,16 +4,11 @@ import { FitAddon } from '@xterm/addon-fit';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { Bridge } from '../../core/ipc/bridge';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import '@xterm/xterm/css/xterm.css';
 
 interface PTYPayload {
-  id: string;
   data: number[];
-}
-
-interface TerminalStatePayload {
-  id: string;
-  state: string;
 }
 
 interface TerminalProps {
@@ -26,82 +21,82 @@ export function TerminalPanel({ overrideId, hideHeader }: TerminalProps = {}) {
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionId = overrideId || 'primary-pty';
+  const { currentWorkspace } = useWorkspaceStore();
   const [terminalState, setTerminalState] = useState<string>('Offline');
 
   useEffect(() => {
+    const isWorkerTerminal = sessionId.startsWith('worker-');
+    if (!isWorkerTerminal && !currentWorkspace) return;
     if (!terminalRef.current) return;
 
     const term = new Terminal({
       theme: {
         background: '#0a0a0f',
-        foreground: '#22d3ee',
-        cursor: '#a855f7',
-        selectionBackground: 'rgba(170, 59, 255, 0.3)',
+        foreground: '#cbd5e1',
+        cursor: '#22d3ee',
+        selectionBackground: 'rgba(34, 211, 238, 0.3)',
       },
-      fontFamily: 'ui-monospace, Consolas, monospace',
-      fontSize: 14,
+      fontFamily: '"Fira Code", monospace',
+      fontSize: 12,
       cursorBlink: true,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(terminalRef.current);
-    
-    // Fit addon requires a tiny timeout occasionally on initial mount in React strict mode
-    setTimeout(() => fitAddon.fit(), 50);
+    fitAddon.fit();
 
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    let unlistenOutput: UnlistenFn | null = null;
-    let unlistenState: UnlistenFn | null = null;
+    let unlisten: UnlistenFn | null = null;
 
-    const setup = async () => {
-      unlistenOutput = await listen<PTYPayload>('pty-output', (event) => {
-        if (event.payload.id === sessionId) {
-          term.write(new Uint8Array(event.payload.data));
+    const initTerminal = async () => {
+      unlisten = await listen<PTYPayload>(`pty_output_${sessionId}`, (event) => {
+        const charData = new Uint8Array(event.payload.data);
+        term.write(charData);
+        setTerminalState('Working');
+      });
+
+      try {
+        if (!isWorkerTerminal && currentWorkspace) {
+          const path = currentWorkspace.path.replace('file://', '');
+          await Bridge.terminalCreate(sessionId, path);
         }
-      });
-
-      unlistenState = await listen<TerminalStatePayload>('pty-state', (event) => {
-        if (event.payload.id === sessionId) {
-          setTerminalState(event.payload.state);
-        }
-      });
-
-      term.onData((data) => {
-        const encoder = new TextEncoder();
-        const ui8 = encoder.encode(data);
-        Bridge.terminalWrite(sessionId, Array.from(ui8));
-      });
-
-      term.onResize((size) => {
-        Bridge.terminalResize(sessionId, size.rows, size.cols);
-      });
-
-      // Request PTY creation in Rust
-      await Bridge.terminalCreate(sessionId);
+        term.writeln('\x1b[36m[Flowmind Ultra Matrix Ready]\x1b[0m');
+        setTerminalState('Online');
+      } catch (err: any) {
+        term.writeln(`\x1b[31m[Critical Error: ${err.message || String(err)}]\x1b[0m`);
+      }
     };
 
-    setup();
+    initTerminal();
 
-    const resizeObserver = new ResizeObserver(() => {
-      try {
-        fitAddon.fit();
-      } catch (e) {}
+    term.onData((data: string) => {
+      const encoder = new TextEncoder();
+      const bytes = Array.from(encoder.encode(data));
+      Bridge.terminalWrite(sessionId, bytes).catch(console.error);
     });
-    resizeObserver.observe(terminalRef.current);
+
+    const handleResize = () => {
+      if (fitAddonRef.current && xtermRef.current) {
+        fitAddonRef.current.fit();
+        const dims = fitAddonRef.current.proposeDimensions();
+        if (dims) {
+          Bridge.terminalResize(sessionId, dims.rows, dims.cols).catch(console.error);
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      resizeObserver.disconnect();
-      if (unlistenOutput) unlistenOutput();
-      if (unlistenState) unlistenState();
-      
-      // Cleanup daemon PTY in backend
-      Bridge.terminalClose(sessionId);
+      window.removeEventListener('resize', handleResize);
+      if (unlisten) unlisten();
+      Bridge.terminalClose(sessionId).catch(console.error);
       term.dispose();
     };
-  }, []);
+  }, [sessionId, currentWorkspace]);
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0f] relative w-full">

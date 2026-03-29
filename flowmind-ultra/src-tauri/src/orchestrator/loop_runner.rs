@@ -123,6 +123,7 @@ pub async fn start_orchestration(
                     title: wc.title.clone(),
                     files: wc.files.clone(),
                     status: "Pending".into(),
+                    cwd: workspace_dir.clone(),
                 });
             }
             for sp in &plan.specialist_pairs {
@@ -131,6 +132,7 @@ pub async fn start_orchestration(
                     title: format!("Pair: {} -> {}", sp.producer_file, sp.consumer_file),
                     files: vec![sp.producer_file.clone(), sp.consumer_file.clone()],
                     status: "Pending".into(),
+                    cwd: workspace_dir.clone(),
                 });
             }
             for sf in &plan.swarm_files {
@@ -139,6 +141,7 @@ pub async fn start_orchestration(
                     title: format!("Config: {}", sf.filepath),
                     files: vec![sf.filepath.clone()],
                     status: "Pending".into(),
+                    cwd: workspace_dir.clone(),
                 });
             }
         }

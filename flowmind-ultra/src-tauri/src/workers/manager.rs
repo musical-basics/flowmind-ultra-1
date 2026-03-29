@@ -112,4 +112,14 @@ impl ClusterManager {
         }
         true
     }
+
+    pub async fn cleanup(&self) {
+        let workers = self.workers.lock().await;
+        for w_arc in workers.iter() {
+            let worker = w_arc.lock().await;
+            if let Some(pty) = &worker.pty_session {
+                pty.lock().await.kill().await;
+            }
+        }
+    }
 }

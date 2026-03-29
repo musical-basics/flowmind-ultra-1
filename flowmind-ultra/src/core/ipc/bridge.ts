@@ -16,8 +16,8 @@ export const Bridge = {
   outboxEnqueue: async (payload: string): Promise<string> => {
     return invoke('outbox_enqueue', { payload });
   },
-  terminalCreate: async (id: string): Promise<void> => {
-    return invoke('terminal_create', { id });
+  terminalCreate: async (id: string, cwd: string): Promise<void> => {
+    return invoke('terminal_create', { id, cwd });
   },
   terminalWrite: async (id: string, data: number[]): Promise<void> => {
     return invoke('terminal_write', { id, data });
