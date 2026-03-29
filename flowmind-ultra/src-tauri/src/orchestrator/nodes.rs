@@ -47,11 +47,19 @@ pub async fn run_overseer(client: &LlmClient, model: &str, prd: &str) -> Result<
     serde_json::from_str(&json_clean).map_err(|e| e.to_string())
 }
 
-pub async fn run_planner(client: &LlmClient, model: &str, sprint_desc: &str, ledger_context: &str) -> Result<TopologicalGraph, String> {
+pub async fn run_planner(
+    client: &LlmClient, 
+    model: &str, 
+    sprint_desc: &str, 
+    ledger_context: &str,
+    memory_context: Option<String>
+) -> Result<TopologicalGraph, String> {
+    let rag_xml = memory_context.map(|ctx| format!("\n<Historical_Context>\n{}\n</Historical_Context>", ctx)).unwrap_or_default();
+    
     let req = ChatRequest {
         model: model.to_string(),
         messages: vec![
-            ChatMessage { role: "system".into(), content: format!("You are the Planner Node. Map out the files needed for this Sprint into a dependency graph. Output STRICT JSON: {{\n  \"files\": [\n    {{\"filepath\": \"src/main.rs\", \"description\": \"setup\", \"dependencies\": []}}\n  ]\n}}\n\nGlobal Ledger Context:\n{}", ledger_context) },
+            ChatMessage { role: "system".into(), content: format!("You are the Planner Node. Map out the files needed for this Sprint into a dependency graph. Output STRICT JSON: {{\n  \"files\": [\n    {{\"filepath\": \"src/main.rs\", \"description\": \"setup\", \"dependencies\": []}}\n  ]\n}}\n\nGlobal Ledger Context:\n{}{}", ledger_context, rag_xml) },
             ChatMessage { role: "user".into(), content: sprint_desc.to_string() }
         ],
         response_format: Some(serde_json::json!({ "type": "json_object" })),

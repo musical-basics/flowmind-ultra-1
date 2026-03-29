@@ -95,8 +95,30 @@ pub async fn start_orchestration(
         // Node 4: Planner
         ctx.active_state = SwarmState::Planner;
         emit_station("Planner", "Active", Some(format!("Planning Chunk {}", chunk.id)));
+        
+        // RAG Retrieval
+        let mut memory_context = None;
+        let cache_dir = app.path().app_cache_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let model_path = cache_dir.join("model.safetensors"); // Assume pre-downloaded or handled by init
+        let tokenizer_path = cache_dir.join("tokenizer.json");
+        
+        if let Ok(engine) = crate::llm::embeddings::EmbeddingEngine::new(&model_path, &tokenizer_path) {
+            if let Ok(vdb) = crate::db::vector::VectorDB::init(&workspace_dir).await {
+                if let Ok(table) = vdb.get_or_create_table("swarm_memory", 384).await {
+                    let query_vec = engine.generate(&chunk.description).unwrap_or_default();
+                    if let Ok(results) = table.query().nearest_to(query_vec).limit(3).execute().await {
+                         let text_results: Vec<String> = results.columns()[2] // "text" column
+                            .as_any().downcast_ref::<arrow_array::StringArray>().unwrap()
+                            .iter().flatten().map(|s| s.to_string()).collect();
+                         memory_context = Some(text_results.join("\n---\n"));
+                         let _ = app.emit("memory_retrieved", memory_context.clone());
+                    }
+                }
+            }
+        }
+
         let current_ledger = ledger.read().unwrap_or_default();
-        let graph = run_planner(&client, &planner_model, &chunk.description, &current_ledger).await?;
+        let graph = run_planner(&client, &planner_model, &chunk.description, &current_ledger, memory_context).await?;
         chunk.dependency_graph = Some(graph.clone());
         emit_station("Planner", "Complete", None);
 
@@ -214,7 +236,22 @@ pub async fn start_orchestration(
         }
 
         ledger.append(&format!("\nSprint {} Completed: {}", chunk.id, chunk.title)).unwrap();
+        
+        // Memory Ingestion Phase (Step 158)
         emit_station("QA", "Complete", Some("✅ Compilation successful. Codebase stabilized.".into()));
+        
+        let workspace_dir_clone = workspace_dir.clone();
+        let app_handle_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+             let cache_dir = app_handle_clone.path().app_cache_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+             let m_path = cache_dir.join("model.safetensors");
+             let t_path = cache_dir.join("tokenizer.json");
+             if let Ok(engine) = crate::llm::embeddings::EmbeddingEngine::new(&m_path, &t_path) {
+                 if let Ok(vdb) = crate::db::vector::VectorDB::init(&workspace_dir_clone).await {
+                     let _ = crate::llm::memory_indexer::index_workspace(&workspace_dir_clone, &engine, &vdb).await;
+                 }
+             }
+        });
     }
 
     ctx.active_state = SwarmState::Complete;

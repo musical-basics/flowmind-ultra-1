@@ -13,6 +13,7 @@ import { useSwarmStore } from '../../stores/useSwarmStore';
 import { useWorkerStore } from '../../stores/useWorkerStore';
 import { FileTree } from '../workspace/FileTree';
 import { FlattenerSettingsPanel } from './FlattenerSettingsPanel';
+import { MemoryViewer } from './MemoryViewer';
 
 export function SwarmDashboard() {
   const [prompt, setPrompt] = useState('');
@@ -110,28 +111,32 @@ export function SwarmDashboard() {
           </button>
         </div>
 
-        <div className="flex flex-col flex-1 min-h-[400px]">
-          <div className="flex gap-4 mb-2 shrink-0">
-            <button onClick={() => setViewTab('agents')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'agents' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Execution Graph</button>
-            <button onClick={() => setViewTab('workers')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'workers' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Worker Clusters</button>
-          </div>
+        <div className="flex flex-1 min-h-[400px] gap-4">
+          <div className="flex flex-col flex-1">
+            <div className="flex gap-4 mb-2 shrink-0">
+              <button onClick={() => setViewTab('agents')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'agents' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Execution Graph</button>
+              <button onClick={() => setViewTab('workers')} className={`px-4 py-1 rounded text-xs font-bold uppercase transition-colors ${viewTab === 'workers' ? 'bg-[#a855f7] text-white' : 'text-slate-400 hover:text-white'}`}>Worker Clusters</button>
+            </div>
 
-          <div className="flex-1 w-full bg-[#0a0a0f] border border-[#2e303a] rounded-lg p-4 h-full relative">
-            {viewTab === 'agents' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full shrink-0">
-                <div className="flex flex-col gap-4 h-full">
-                  <GraphViewer />
-                  <CommanderViewer />
+            <div className="flex-1 w-full bg-[#0a0a0f] border border-[#2e303a] rounded-lg p-4 relative h-full shrink-0">
+              {viewTab === 'agents' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+                  <div className="flex flex-col gap-4 h-full">
+                    <GraphViewer />
+                    <CommanderViewer />
+                  </div>
+                  <div className="flex flex-col gap-4 h-full">
+                    <SpecViewer />
+                    <SprintViewer />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-4 h-full">
-                  <SpecViewer />
-                  <SprintViewer />
-                </div>
-              </div>
-            ) : (
-              <WorkerDashboard />
-            )}
+              ) : (
+                <WorkerDashboard />
+              )}
+            </div>
           </div>
+          
+          {viewTab === 'agents' && <MemoryViewer />}
         </div>
       </div>
     </div>
