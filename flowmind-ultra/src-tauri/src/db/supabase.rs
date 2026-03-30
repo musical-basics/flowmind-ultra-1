@@ -55,8 +55,9 @@ impl SupabaseClient {
             .map_err(|e| e.to_string())?;
 
         if !res.status().is_success() {
+            let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Supabase Error: {} - {}", res.status(), err_text));
+            return Err(format!("Supabase Error: {} - {}", status, err_text));
         }
 
         Ok(())

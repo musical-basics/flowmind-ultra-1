@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::fs;
 use std::sync::Arc;
-use arrow_array::{RecordBatch, StringArray, FixedSizeListArray, Float32Array};
+use arrow_array::{RecordBatch, RecordBatchIterator, StringArray, FixedSizeListArray, Float32Array, Array, ArrayRef};
 use arrow_schema::{Schema, Field, DataType};
 use lancedb::Table;
 use crate::db::vector::VectorDB;
@@ -48,19 +48,26 @@ pub async fn index_file(
     // Convert Vec<Option<Vec<f32>>> to FixedSizeListArray
     let flat_vectors: Vec<f32> = vectors.into_iter().flatten().flatten().collect();
     let vector_array = Float32Array::from(flat_vectors);
-    let list_array = FixedSizeListArray::try_new_from_values(vector_array, 384).map_err(|e| e.to_string())?;
+    let field = Arc::new(Field::new("item", DataType::Float32, true));
+    let values = Arc::new(vector_array) as Arc<dyn Array>;
+    let list_array = FixedSizeListArray::try_new(field, 384, values, None).map_err(|e| e.to_string())?;
 
     let batch = RecordBatch::try_new(
         schema.clone(),
         vec![
-            Arc::new(StringArray::from(ids)),
-            Arc::new(StringArray::from(paths)),
-            Arc::new(StringArray::from(texts)),
-            Arc::new(list_array),
+            Arc::new(StringArray::from(ids)) as ArrayRef,
+            Arc::new(StringArray::from(paths)) as ArrayRef,
+            Arc::new(StringArray::from(texts)) as ArrayRef,
+            Arc::new(list_array) as ArrayRef,
         ],
     ).map_err(|e| e.to_string())?;
 
-    table.add(Box::new(vec![Ok(batch)].into_iter())).execute().await.map_err(|e| e.to_string())
+    let reader = RecordBatchIterator::new(
+        vec![Ok(batch)].into_iter(),
+        schema,
+    );
+
+    table.add(Box::new(reader)).execute().await.map_err(|e| e.to_string())
 }
 
 pub async fn index_workspace(

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex, OnceLock};
 use super::capture::AudioSystem;
 use super::transcribe::{WhisperEngine, download_model_if_missing};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager, Emitter};
 
 static AUDIO_SYS: OnceLock<Arc<Mutex<AudioSystem>>> = OnceLock::new();
 static WHISPER_ENG: OnceLock<Arc<WhisperEngine>> = OnceLock::new();
@@ -29,7 +29,7 @@ pub async fn start_voice_dictation(app: AppHandle) -> Result<(), String> {
     }
 
     let mut lock = sys.lock().unwrap();
-    lock.start_capture(app)?;
+    lock.start_capture(app.clone())?;
     Ok(())
 }
 

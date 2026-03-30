@@ -1,4 +1,4 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use super::loop_runner::start_orchestration;
 
 #[tauri::command]

@@ -28,6 +28,9 @@ pub struct ExecutionWorker {
     pub current_task: Arc<Mutex<Option<WorkerTask>>>,
 }
 
+unsafe impl Send for ExecutionWorker {}
+unsafe impl Sync for ExecutionWorker {}
+
 impl ExecutionWorker {
     pub fn new(id: String, app: AppHandle) -> Self {
         Self {

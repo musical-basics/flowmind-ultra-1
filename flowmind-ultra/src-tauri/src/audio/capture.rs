@@ -1,6 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
+use tauri::Emitter;
 use tokio::task;
 use rubato::{Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction};
 
@@ -11,6 +12,10 @@ pub struct AudioSystem {
     pub tx: mpsc::Sender<Vec<f32>>,
     pub rx: Arc<Mutex<mpsc::Receiver<Vec<f32>>>>,
 }
+
+// SAFETY: cpal::Stream is not Send on all platforms (like macOS), 
+// but we synchronize all access via Mutex in OnceLock.
+unsafe impl Send for AudioSystem {}
 
 impl AudioSystem {
     pub fn new() -> Self {

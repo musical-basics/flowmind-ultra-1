@@ -29,13 +29,17 @@ pub enum TerminalState {
 pub struct TerminalSession {
     pub id: String,
     pub master: Box<dyn MasterPty + Send>,
-    pub child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
+    pub writer: Arc<Mutex<Box<dyn std::io::Write + Send>>>,
+    pub child: Arc<Mutex<Box<dyn Child + Send>>>,
     pub state: Arc<Mutex<TerminalState>>,
     pub output_buffer: Arc<Mutex<String>>,
 }
 
+unsafe impl Send for TerminalSession {}
+unsafe impl Sync for TerminalSession {}
+
 impl TerminalSession {
-    pub fn spawn(id: String, app: AppHandle) -> Result<Arc<Mutex<Self>>, String> {
+    pub fn spawn(id: String, cwd: String, app: AppHandle) -> Result<Arc<Mutex<Self>>, String> {
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -47,17 +51,21 @@ impl TerminalSession {
             .map_err(|e| e.to_string())?;
 
         let shell = if cfg!(windows) { "powershell.exe" } else { "zsh" };
-        let cmd = CommandBuilder::new(shell);
-        let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
-
         let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-        let child_arc = Arc::new(Mutex::new(child));
+        let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+        let writer_arc = Arc::new(Mutex::new(writer));
+        
+        let mut cmd = CommandBuilder::new(shell);
+        cmd.cwd(cwd);
+        let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+        let child_arc = Arc::new(Mutex::new(child as Box<dyn Child + Send>)); 
         let state = Arc::new(Mutex::new(TerminalState::Connecting));
         let output_buffer = Arc::new(Mutex::new(String::new()));
 
         let session = Arc::new(Mutex::new(TerminalSession {
             id: id.clone(),
             master: pair.master,
+            writer: writer_arc,
             child: child_arc.clone(),
             state: state.clone(),
             output_buffer: output_buffer.clone(),
@@ -136,8 +144,9 @@ impl TerminalSession {
     }
 
     pub fn write(&self, data: &[u8]) -> Result<(), String> {
-        let mut writer = self.master.try_clone_writer().map_err(|e| e.to_string())?;
-        std::io::Write::write_all(&mut writer, data).map_err(|e| e.to_string())?;
+        let mut writer = tauri::async_runtime::block_on(async { self.writer.lock().await });
+        writer.write_all(data).map_err(|e| e.to_string())?;
+        writer.flush().map_err(|e| e.to_string())?;
         Ok(())
     }
 

@@ -18,6 +18,7 @@ pub async fn exec_global_script(manager: State<'_, Arc<ClusterManager>>, script:
         files: vec![],
         status: "Pending".into(),
         cwd,
+        model: "anthropic/claude-3-5-sonnet-20241022".into(),
     }]).await;
     Ok(())
 }
@@ -39,7 +40,7 @@ pub async fn get_snapshot_timeline(state: State<'_, DbState>, workspace_id: Stri
     let table = read_txn.open_table(SNAPSHOT_TIMELINE).map_err(|e| e.to_string())?;
     
     let mut timeline = Vec::new();
-    for item in table.iter().map_err(|e| e.to_string())? {
+    for item in table.range::<u64>(..).map_err(|e| e.to_string())? {
         let (ts, msg) = item.map_err(|e| e.to_string())?;
         timeline.push(CommitNode {
             timestamp: ts.value(),
@@ -57,7 +58,7 @@ pub async fn revert_to_snapshot(state: State<'_, DbState>, workspace_id: String,
     let snapshots = read_txn.open_table(FILE_SNAPSHOTS).map_err(|e| e.to_string())?;
     
     // Iterate and apply patches
-    for item in snapshots.iter().map_err(|e| e.to_string())? {
+    for item in snapshots.range::<(u64, &str)>(..).map_err(|e| e.to_string())? {
         let (key, val) = item.map_err(|e| e.to_string())?;
         let (ts, path) = key.value();
         

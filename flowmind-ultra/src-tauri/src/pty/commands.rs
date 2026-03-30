@@ -28,7 +28,10 @@ pub async fn terminal_resize(manager: State<'_, TerminalManager>, id: String, ro
 #[tauri::command]
 pub async fn terminal_close(manager: State<'_, TerminalManager>, id: String) -> Result<(), String> {
     if let Some(session) = manager.remove_session(&id).await {
-        session.lock().await.kill().await;
+        tauri::async_runtime::spawn(async move {
+            let session_lock = session.lock().await;
+            session_lock.kill().await;
+        });
     }
     Ok(())
 }

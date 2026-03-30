@@ -59,9 +59,8 @@ impl ClusterManager {
         let mut i = 0;
         
         while i < q.len() {
-            let task = &q[i];
-
-            if !self.conflict_mgr.attempt_lock(&task.files).await {
+            let task_files = q[i].files.clone();
+            if !self.conflict_mgr.attempt_lock(&task_files).await {
                 i += 1;
                 continue;
             }
@@ -89,7 +88,7 @@ impl ClusterManager {
             }
 
             if !assigned {
-                self.conflict_mgr.release(&task.files).await;
+                self.conflict_mgr.release(&task_files).await;
                 break;
             }
         }

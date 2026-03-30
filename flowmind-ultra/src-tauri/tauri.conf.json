@@ -34,9 +34,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "FlowMind Ultra requires microphone access for Voice Dictation."
-      }
+      "infoPlist": "Info.plist"
     }
   }
 }

@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 mod db;
 mod pty;
 mod llm;
@@ -111,5 +112,6 @@ pub fn run() {
             });
         }
     })
+    .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

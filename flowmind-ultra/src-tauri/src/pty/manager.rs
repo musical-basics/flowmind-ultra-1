@@ -33,7 +33,10 @@ impl TerminalManager {
     pub async fn kill_all(&self) {
         let mut lock = self.sessions.lock().await;
         for (_, session) in lock.drain() {
-            session.lock().await.kill().await;
+            tauri::async_runtime::spawn(async move {
+                let session_lock = session.lock().await;
+                session_lock.kill().await;
+            });
         }
     }
 }

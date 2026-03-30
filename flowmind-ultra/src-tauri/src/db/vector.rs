@@ -6,7 +6,7 @@ use arrow_schema::{DataType, Field, Schema};
 use std::path::PathBuf;
 
 pub struct VectorDB {
-    pub conn: Arc<dyn Connection>,
+    pub conn: Connection,
 }
 
 impl VectorDB {
@@ -17,7 +17,7 @@ impl VectorDB {
         let uri = format!("file://{}", db_path.to_string_lossy());
         let conn = lancedb::connect(&uri).execute().await.map_err(|e| e.to_string())?;
 
-        Ok(Self { conn: Arc::new(conn) })
+        Ok(Self { conn })
     }
 
     pub async fn get_or_create_table(&self, table_name: &str, dim: usize) -> Result<Table, String> {
@@ -35,7 +35,7 @@ impl VectorDB {
         ]));
 
         // Create an empty batch to initialize the table
-        let batches = RecordBatchIterator::new(vec![Ok(RecordBatch::new_empty(schema.clone()))], schema);
+        let batches = RecordBatchIterator::new(vec![Ok(RecordBatch::new_empty(schema.clone()))].into_iter(), schema);
         
         self.conn.create_table(table_name, Box::new(batches)).execute().await.map_err(|e| e.to_string())
     }
